@@ -2,9 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class Api {
-  static const String base = "http://192.168.1.11:8080";
+  static const String base = "http://192.168.1.10:8080";
 
   static Future<String?> _token() async {
     final sp = await SharedPreferences.getInstance();
@@ -129,5 +132,57 @@ class Api {
     );
     final data = jsonDecode(res.body);
     return data['reply'] ?? "No response";
+  }
+
+  static Future<String> exportExcel() async {
+    try {
+      // Add authorization header since we're accessing user data
+      final res = await http.get(
+        Uri.parse("$base/export"),
+        headers: await _headers(auth: true),
+      );
+
+      if (res.statusCode != 200) {
+        final error = jsonDecode(res.body)['error'] ?? 'Unknown error';
+        throw Exception('Failed to download Excel file: $error');
+      }
+
+      // Get the filename from Content-Disposition header or use default
+      String filename = 'users.xlsx';
+      final disposition = res.headers['content-disposition'];
+      if (disposition != null && disposition.contains('filename=')) {
+        filename = disposition.split('filename=')[1].replaceAll('"', '');
+      }
+
+      // Save to Downloads folder on Android/iOS
+      final dir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final file = File(
+        "${dir.path}/${filename.replaceAll('.xlsx', '')}_$timestamp.xlsx",
+      );
+      await file.writeAsBytes(res.bodyBytes);
+
+      // First try to open the file
+      final result = await OpenFilex.open(
+        file.path,
+        type:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        uti: 'com.microsoft.excel.xlsx',
+      );
+
+      // If opening fails or returns error, share the file instead
+      if (result.type != ResultType.done ||
+          result.message.toLowerCase().contains('error')) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          subject: 'Danh sách người dùng',
+          text: 'Xuất danh sách từ Admin Panel',
+        );
+      }
+
+      return file.path;
+    } catch (e) {
+      throw Exception('Lỗi khi xuất file Excel: $e');
+    }
   }
 }

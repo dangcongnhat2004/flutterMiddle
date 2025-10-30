@@ -3,6 +3,7 @@ import '../services/api.dart';
 import 'login_screen.dart';
 import 'user_form_screen.dart';
 import 'chat_screen.dart';
+import 'stats_screen.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -71,6 +72,15 @@ class _UserListScreenState extends State<UserListScreen> {
               );
             },
             icon: const Icon(Icons.logout),
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const StatsScreen()),
+              );
+            },
+            icon: const Icon(Icons.bar_chart),
           ),
         ],
       ),
